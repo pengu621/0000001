@@ -1,0 +1,7 @@
+*******************************************************
+Dataset : ckm
+ARGS : {'dataset': 'ckm', 'gpu': -1, 'seed': 72, 'runs': 10, 'edge_dim': 8, 'node_dim': 128, 'phi_dim': 128, 'hidden_dim': 256, 'num_hidden': 2, 'epochs': 100, 'n_heads': 1, 'heads_mode': 'concat', 'predictor': 'mlp', 'omn': 'oan;maan', 'dropout': 0.5, 'attn_dropout': 0.7, 'lr': 0.001, 'weight_decay': 1e-05, 'psi': 0.5, 'no_gnn': False, 'no_struct': False, 'root': './data/nets/', 'save_dir': './artifacts/', 'prep_dir': './data/prep_nets/', 'ck_dir': 'checkpoint', 'device': device(type='cpu')}
+
+auc Test: 99.261
+ap Test: 99.233
+

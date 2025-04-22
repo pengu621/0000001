@@ -4,12 +4,14 @@ import torch.nn.functional as F
 from torch_scatter import scatter_add
 from torch_sparse import SparseTensor
 import dgl
+from models.TransEncoder import TransformerEncoder  # 导入 TransformerEncoder
+
 
 # ISL
 class MLStruct(torch.nn.Module):
 
     def __init__(self, edge_dim, node_dim, phi_dim, n_layers, beta=1.0,  dropout=0.2,
-                 f_dropout=0.7, eps=1e-8):
+                 f_dropout=0.7, eps=1e-8, d_model=64, num_layers=2, num_heads=4, attention_type="multi_head"):
         super(MLStruct, self).__init__()
 
         self.n_layers = n_layers
@@ -33,6 +35,9 @@ class MLStruct(torch.nn.Module):
             cns_l.append(f_node)
             cns_l.append(g_phi)
             self.cns.append(cns_l)
+
+        # 添加 TransformerEncoder 实例
+        self.transformer_encoder = TransformerEncoder(d_model, num_layers, num_heads, attention_type)
 
         self.reset_parameters()
 
@@ -109,6 +114,11 @@ class MLStruct(torch.nn.Module):
             D = d_src * d_dst
             out_struct_n = (out_struct / D).unsqueeze(-1)
 
+            # 使用 TransformerEncoder 处理 out_struct_n
+            out_struct_n = out_struct_n.unsqueeze(1)  # 添加序列维度
+            out_struct_n = self.transformer_encoder(out_struct_n)
+            out_struct_n = out_struct_n.squeeze(1)  # 移除序列维度
+
             out_struct_n = g_phi(out_struct_n)
 
             out_structs.append(out_struct_n)
@@ -121,7 +131,7 @@ class MLStruct(torch.nn.Module):
 # MAAN
 class MAA(torch.nn.Module):
 
-    def __init__(self, n_layers, beta, eps=1e-16, **kwargs):
+    def __init__(self, n_layers, beta, eps=1e-16, d_model=64, num_layers=2, num_heads=4, attention_type="multi_query", **kwargs):
         super(MAA, self).__init__()
         self.n_layers = n_layers
         self.beta = beta
@@ -137,6 +147,9 @@ class MAA(torch.nn.Module):
                                                     nn.ReLU(), nn.Linear(self.phi_dim, 1)))
             self.g_phi2.append(torch.nn.Sequential(torch.nn.Linear(1, self.phi_dim),
                                                     nn.ReLU(), nn.Linear(self.phi_dim, 1)))
+        # 添加 TransformerEncoder 实例
+        self.transformer_encoder = TransformerEncoder(d_model, num_layers, num_heads, attention_type)
+
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -244,6 +257,12 @@ class MAA(torch.nn.Module):
                     D = d_src * d_dst
                     D_rev = d_src_rev * d_dst_rev
                     out_struct_n = ((out_struct / D) + (out_struct_rev / D_rev)).unsqueeze(-1)
+
+                    # 使用 TransformerEncoder 处理 out_struct_n
+                    out_struct_n = out_struct_n.unsqueeze(1)  # 添加序列维度
+                    out_struct_n = self.transformer_encoder(out_struct_n)
+                    out_struct_n = out_struct_n.squeeze(1)  # 移除序列维度
+
                     out_struct_n = self.g_phi1[lid1](out_struct_n)
                     sl1 = sl1 + self.beta * (out_struct_n / lm)
 
@@ -255,7 +274,7 @@ class MAA(torch.nn.Module):
 
 # OAN
 class Glob(torch.nn.Module):
-    def __init__(self, n_layers, beta,  eps=1e-8, **kwargs):
+    def __init__(self, n_layers, beta,  eps=1e-8, d_model=64, num_layers=2, num_heads=4, attention_type="multi_query", **kwargs):
         super(Glob, self).__init__()
         self.n_layers = n_layers
         self.eps = eps
@@ -270,6 +289,9 @@ class Glob(torch.nn.Module):
                                                    nn.ReLU(), nn.Linear(self.phi_dim, 1)))
             self.g_phi2.append(torch.nn.Sequential(torch.nn.Linear(1, self.phi_dim),
                                                        nn.ReLU(), nn.Linear(self.phi_dim, 1)))
+
+        # 添加 TransformerEncoder 实例
+        self.transformer_encoder = TransformerEncoder(d_model, num_layers, num_heads, attention_type)
 
         self.reset_parameters()
 
@@ -358,6 +380,11 @@ class Glob(torch.nn.Module):
                     d_dst = torch.norm(mat_dst_dense, dim=-1)
                     D = d_src * d_dst
                     out_struct_n = (out_struct / D).unsqueeze(-1)
+
+                    # 使用 TransformerEncoder 处理 out_struct_n
+                    out_struct_n = out_struct_n.unsqueeze(1)  # 添加序列维度
+                    out_struct_n = self.transformer_encoder(out_struct_n)
+                    out_struct_n = out_struct_n.squeeze(1)  # 移除序列维度
 
                     out_struct_n = self.g_phi1[lid1](out_struct_n)
 

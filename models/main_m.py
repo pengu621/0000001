@@ -4,6 +4,7 @@ from models.mgat import MGAT
 import torch
 from models.sfg import MAA, Glob
 import utils.const as C
+from models.TransEncoder import TransformerEncoder
 
 
 class Mm(nn.Module):
@@ -51,6 +52,13 @@ class Mm(nn.Module):
                 self.aggregation = args['aggregation']
 
             self.gnn_model = MGAT(self.num_hidden, self.input_dim, self.hidden_dim, self.heads, self.activation, self.aggregation, self.dropout, self.attn_dropout, residual=self.residual)
+
+            # 添加 TransformerEncoder 实例
+            d_model = self.hidden_dim  # 使用 MGAT 的隐藏维度作为 TransformerEncoder 的输入维度
+            num_layers = 2  # 可以根据需要调整
+            num_heads = 4  # 可以根据需要调整
+            attention_type = "multi_query"
+            self.transformer_encoder = TransformerEncoder(d_model, num_layers, num_heads, attention_type)
 
         if self.gnn and self.struct:
             par = torch.FloatTensor([0, 0]).repeat(self.n_layers, 1)
@@ -101,6 +109,14 @@ class Mm(nn.Module):
 
         if self.gnn:
             out_gnn = self.gnn_model(g_supra, features)
+
+            # 添加序列维度以适应 TransformerEncoder 的输入
+            out_gnn = out_gnn.unsqueeze(1)
+            # 使用 TransformerEncoder 处理 out_gnn
+            out_gnn = self.transformer_encoder(out_gnn)
+            # 移除序列维度
+            out_gnn = out_gnn.squeeze(1)
+
             out_gnns_l = list(out_gnn.view(self.n_layers, -1, out_gnn.shape[1]))
             out_gnns = []
             for l_id in range(self.n_layers):
